@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Song Downloader</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f0f12;
+      --surface: #1a1a1f;
+      --accent: #00d4aa;
+      --accent-dim: #00a884;
+      --text: #e8e8ed;
+      --text-muted: #8b8b95;
+      --border: #2a2a32;
+      --error: #ff6b6b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      min-height: 100dvh;
+      padding: 1rem;
+      padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    }
+
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+      padding-top: 1rem;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), #00f5c4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    .card {
+      background: var(--surface);
+      border-radius: 1rem;
+      border: 1px solid var(--border);
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 140px;
+      padding: 1rem;
+      font-family: inherit;
+      font-size: 1rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      color: var(--text);
+      resize: vertical;
+      transition: border-color 0.2s;
+    }
+
+    textarea::placeholder {
+      color: var(--text-muted);
+      opacity: 0.7;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .hint {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+    }
+
+    button {
+      width: 100%;
+      padding: 1rem 1.5rem;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 600;
+      background: linear-gradient(135deg, var(--accent), var(--accent-dim));
+      color: var(--bg);
+      border: none;
+      border-radius: 0.75rem;
+      cursor: pointer;
+      transition: transform 0.15s, opacity 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button:hover {
+      opacity: 0.95;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .message {
+      padding: 1rem;
+      border-radius: 0.75rem;
+      font-size: 0.9rem;
+      margin-top: 1rem;
+      display: none;
+    }
+
+    .message.error {
+      background: rgba(255, 107, 107, 0.15);
+      color: var(--error);
+      border: 1px solid rgba(255, 107, 107, 0.3);
+    }
+
+    .message.success {
+      background: rgba(0, 212, 170, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(0, 212, 170, 0.3);
+    }
+
+    .message.visible {
+      display: block;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 1rem;
+      height: 1rem;
+      border: 2px solid rgba(0,0,0,0.2);
+      border-top-color: var(--bg);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 0.5rem;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    footer {
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Song Downloader</h1>
+      <p class="subtitle">High-quality MP3 downloads</p>
+    </header>
+
+    <div class="card">
+      <label for="songs">Song names (one per line)</label>
+      <textarea
+        id="songs"
+        placeholder="Artist - Song Name&#10;Another Artist - Another Song&#10;..."
+        autocomplete="off"
+      ></textarea>
+      <p class="hint">Add artist name for better results. Max 10 songs per download.</p>
+
+      <button type="button" id="submit" aria-label="Download songs">
+        Download MP3
+      </button>
+
+      <div id="message" class="message" role="alert"></div>
+    </div>
+
+    <footer>
+      For personal use only. Ensure you have rights to download the content.
+    </footer>
+  </div>
+
+  <script>
+    const songsInput = document.getElementById('songs');
+    const submitBtn = document.getElementById('submit');
+    const messageEl = document.getElementById('message');
+
+    function showMessage(text, type) {
+      messageEl.textContent = text;
+      messageEl.className = 'message visible ' + type;
+    }
+
+    function hideMessage() {
+      messageEl.className = 'message';
+    }
+
+    submitBtn.addEventListener('click', async () => {
+      const raw = songsInput.value.trim();
+      const songs = raw.split('\n').map(s => s.trim()).filter(Boolean);
+
+      if (songs.length === 0) {
+        showMessage('Please enter at least one song name.', 'error');
+        return;
+      }
+
+      if (songs.length > 10) {
+        showMessage('Maximum 10 songs per download. Please remove some.', 'error');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner"></span>Downloading...';
+      hideMessage();
+
+      try {
+        const res = await fetch('/api/download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ songs })
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || `Error ${res.status}`);
+        }
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'songs.zip';
+        a.click();
+        URL.revokeObjectURL(url);
+
+        showMessage(`Downloaded ${songs.length} song(s) as songs.zip`, 'success');
+      } catch (err) {
+        showMessage(err.message || 'Download failed. Try again.', 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Download MP3';
+      }
+    });
+  </script>
+</body>
+</html>
