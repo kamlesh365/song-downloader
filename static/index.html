@@ -256,15 +256,41 @@
           throw new Error(data.error || `Error ${res.status}`);
         }
 
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'songs.zip';
-        a.click();
-        URL.revokeObjectURL(url);
+        const contentType = (res.headers.get('content-type') || '').toLowerCase();
 
-        showMessage(`Downloaded ${songs.length} song(s) as songs.zip`, 'success');
+        // Single-song responses come back as an mp3 file
+        if (!contentType.includes('application/json')) {
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = (songs[0] || 'song') + '.mp3';
+          a.click();
+          URL.revokeObjectURL(url);
+          showMessage('Downloaded 1 song as MP3', 'success');
+          return;
+        }
+
+        // Multi-song responses come back as JSON containing per-file links
+        const data = await res.json();
+        const downloads = Array.isArray(data.downloads) ? data.downloads : [];
+        if (downloads.length === 0) {
+          throw new Error('No downloadable files returned.');
+        }
+
+        // Trigger separate downloads (browser may ask to allow multiple downloads)
+        downloads.forEach((d, idx) => {
+          setTimeout(() => {
+            const a = document.createElement('a');
+            a.href = d.url;
+            a.download = d.name || '';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+          }, idx * 350);
+        });
+
+        showMessage(`Starting ${downloads.length} MP3 download(s)...`, 'success');
       } catch (err) {
         showMessage(err.message || 'Download failed. Try again.', 'error');
       } finally {

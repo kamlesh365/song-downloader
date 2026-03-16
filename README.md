@@ -31,7 +31,7 @@ Open [http://localhost:5000](http://localhost:5000) in your browser. On mobile, 
 
 1. Enter song names in the text area, one per line (e.g. `Artist - Song Name`)
 2. Click **Download MP3**
-3. A `songs.zip` file will download with all songs in MP3 format
+3. If you enter 1 song, the `.mp3` downloads directly. If you enter multiple songs, your browser will download multiple `.mp3` files (you may be prompted to allow multiple downloads).
 
 **Tips for better results:**
 - Include both artist and song title
