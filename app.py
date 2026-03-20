@@ -58,8 +58,9 @@ def make_mp3_filename(song_name: str, used: set[str]) -> str:
 
 def resolve_ffmpeg_location() -> str | None:
     """
-    Return a path yt-dlp can use to locate ffmpeg/ffprobe.
-    Prefers explicit env var, then common Windows install locations.
+    Return a directory path that contains BOTH ffmpeg and ffprobe.
+    yt-dlp's `ffmpeg_location` works best when it points to the folder
+    containing the binaries (or to a binary whose parent folder we infer).
     """
     env_loc = os.environ.get("FFMPEG_LOCATION") or os.environ.get("FFMPEG_PATH")
     candidates: list[Path] = []
@@ -72,15 +73,30 @@ def resolve_ffmpeg_location() -> str | None:
         Path(r"C:\Tools\ffmpeg\bin"),
     ])
 
+    # Common locations on Linux (PythonAnywhere)
+    candidates.extend([
+        Path("/usr/bin"),
+        Path("/usr/local/bin"),
+        Path("/bin"),
+    ])
+
     for p in candidates:
         try:
+            dirs: list[Path] = []
             if p.is_dir():
-                if (p / "ffmpeg.exe").exists() and (p / "ffprobe.exe").exists():
-                    return str(p)
+                dirs = [p]
             elif p.is_file():
-                # allow pointing directly at ffmpeg.exe
-                if p.name.lower() == "ffmpeg.exe" and p.exists():
-                    return str(p)
+                dirs = [p.parent]
+            else:
+                continue
+
+            for d in dirs:
+                ffmpeg_bin = d / "ffmpeg"
+                ffprobe_bin = d / "ffprobe"
+                ffmpeg_exe = d / "ffmpeg.exe"
+                ffprobe_exe = d / "ffprobe.exe"
+                if (ffmpeg_bin.exists() and ffprobe_bin.exists()) or (ffmpeg_exe.exists() and ffprobe_exe.exists()):
+                    return str(d)
         except OSError:
             continue
 
@@ -97,6 +113,24 @@ def download_song(song_name: str, output_dir: Path) -> str | None:
     search_query = f"ytsearch1:{song_name}"
 
     ffmpeg_location = resolve_ffmpeg_location()
+
+    # PythonAnywhere (and some networks) route outbound requests via a proxy that may return 403.
+    # If enabled, we drop proxy env vars for yt-dlp so it can connect directly.
+    if os.environ.get("YTDLP_NO_PROXY") == "1":
+        for k in [
+            "HTTP_PROXY",
+            "HTTPS_PROXY",
+            "ALL_PROXY",
+            "http_proxy",
+            "https_proxy",
+            "all_proxy",
+        ]:
+            if k in os.environ:
+                os.environ.pop(k, None)
+        # If NO_PROXY is set incorrectly, it can still route requests via proxy.
+        # Setting it to '*' forces direct access for all destinations.
+        os.environ["NO_PROXY"] = "*"
+
     ydl_opts = {
         'format': 'bestaudio/best',
         'outtmpl': str(output_dir / '%(title)s.%(ext)s'),
@@ -107,6 +141,15 @@ def download_song(song_name: str, output_dir: Path) -> str | None:
         }],
         # Avoid relying on PATH (common issue on Windows)
         **({'ffmpeg_location': ffmpeg_location} if ffmpeg_location else {}),
+        'http_headers': {
+            # yt-dlp sometimes gets blocked without a UA header.
+            'User-Agent': os.environ.get(
+                "YTDLP_USER_AGENT",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            ),
+            'Accept-Language': os.environ.get("YTDLP_ACCEPT_LANGUAGE", "en-US,en;q=0.9"),
+        },
         'quiet': True,
         'no_warnings': True,
     }
@@ -119,7 +162,15 @@ def download_song(song_name: str, output_dir: Path) -> str | None:
         for f in output_dir.glob("*.mp3"):
             return str(f)
         return None
-    except Exception:
+    except Exception as e:
+        # Helpful for debugging on hosts like PythonAnywhere.
+        # (yt-dlp errors often include why it couldn't find ffmpeg/ffprobe or reach YouTube.)
+        print(
+            f"[download_song] Failed: {song_name!r} | "
+            f"ffmpeg_location={ffmpeg_location!r} | "
+            f"HTTP_PROXY={os.environ.get('HTTP_PROXY')!r} HTTPS_PROXY={os.environ.get('HTTPS_PROXY')!r} | "
+            f"err={e}"
+        )
         return None
 
 
